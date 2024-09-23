@@ -90,3 +90,26 @@ func (tx SignedTx) Validate() error {
 
 	return nil
 }
+
+// FromAccount extracts the account id that signed the transaction.
+func (tx SignedTx) FromAccount() (AccountID, error) {
+	address, err := signature.FromAddress(tx.Tx, tx.V, tx.R, tx.S)
+	return AccountID(address), err
+}
+
+// SignatureString returns the signature as a string.
+func (tx SignedTx) SignatureString() string {
+	return signature.String(tx.V, tx.R, tx.S)
+}
+
+// String implements the fmt.Stringer interface for logging.
+func (tx SignedTx) String() string {
+	from, err := tx.FromAccount()
+	if err != nil {
+		from = "unknown"
+	}
+
+	return fmt.Sprintf("%s:%d", from, tx.Nonce)
+}
+
+// ============================================================================

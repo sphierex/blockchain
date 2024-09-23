@@ -2,6 +2,7 @@ package signature
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math/big"
@@ -72,6 +73,49 @@ func VerifySignature(value any, v, r, s *big.Int) error {
 	return nil
 }
 
+// FromAddress extracts the address for the account that signed the transaction.
+func FromAddress(value any, v, r, s *big.Int) (string, error) {
+
+	// Prepare the transaction for public key extraction.
+	data, err := stamp(value)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the [R|S|V] format into the original 65 bytes.
+	sig := ToSignatureBytes(v, r, s)
+
+	// Validate the signature since there can be conversion issues
+	// between [R|S|V] to []bytes, Leading 0's are truncated by big package.
+	// publicKey, err := crypto.SigToPub(data, sig)
+	var sigPublicKey []byte
+	{
+		sigPublicKey, err := crypto.Ecrecover(data, sig)
+		if err != nil {
+			return "", err
+		}
+
+		rs := sig[:crypto.RecoveryIDOffset]
+		if !crypto.VerifySignature(sigPublicKey, data, rs) {
+			return "", errors.New("invalid signature")
+		}
+	}
+
+	// Capture the public key associated with this signature.
+	// x, y := elliptic.Unmarshal(crypto.S256(), sigPublicKey)
+	x, y := crypto.S256().Unmarshal(sigPublicKey)
+	publicKey := ecdsa.PublicKey{Curve: crypto.S256(), X: x, Y: y}
+
+	// Extract the account address from the public key.
+	return crypto.PubkeyToAddress(publicKey).String(), nil
+}
+
+// String returns the signature as a string.
+// as SignatureString.
+func String(v, r, s *big.Int) string {
+	return "0x" + hex.EncodeToString(ToSignatureBytesWithSophiaID(v, r, s))
+}
+
 // ============================================================================
 
 // stamp returns a hash of 32 bytes that represents this transaction with
@@ -129,6 +173,15 @@ func ToSignatureBytes(v, r, s *big.Int) []byte {
 	}
 
 	sig[64] = byte(v.Uint64() - sophiaID)
+
+	return sig
+}
+
+// ToSignatureBytesWithSophiaID converts the r, s, v values into a slice of bytes
+// keeping the Sophia id.
+func ToSignatureBytesWithSophiaID(v, r, s *big.Int) []byte {
+	sig := ToSignatureBytes(v, r, s)
+	sig[64] = byte(v.Uint64())
 
 	return sig
 }
