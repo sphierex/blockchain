@@ -12,6 +12,7 @@ import (
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/sphierex/blockchain/cmd/apps/node/handlers"
+	"github.com/sphierex/blockchain/pkg/blockchain/genesis"
 	"github.com/sphierex/blockchain/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -82,6 +83,14 @@ func run(log *zap.SugaredLogger) error {
 		return fmt.Errorf("generating config for output: %w", err)
 	}
 	log.Infow("startup", "config", out)
+
+	// =========================================================================
+	// Blockchain
+	gen, err := genesis.Load()
+	if err != nil {
+		return fmt.Errorf("genesis load: %w", err)
+	}
+	log.Infow("startup", "genesis", gen)
 
 	// =========================================================================
 	// Start Debug Service
