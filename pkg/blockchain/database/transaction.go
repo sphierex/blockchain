@@ -2,6 +2,7 @@ package database
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -73,4 +74,19 @@ type SignedTx struct {
 	V *big.Int `json:"v"` // Ethereum: Recovery identifier, either 29 or 30 with sophiaID.
 	R *big.Int `json:"r"` // Ethereum: First coordinate of the ECDSA signature.
 	S *big.Int `json:"s"` // Ethereum: Second coordinate of the ECDSA signature.
+}
+
+// Validate verifies the transaction has a proper signature that conforms to our
+// standards and is associated with the data claimed to be signed. It also
+// checks the format of the account.
+func (tx SignedTx) Validate() error {
+	if !tx.ToID.IsAccountID() {
+		return errors.New("invalid account for to account")
+	}
+
+	if err := signature.VerifySignature(tx.Tx, tx.V, tx.R, tx.S); err != nil {
+		return err
+	}
+
+	return nil
 }

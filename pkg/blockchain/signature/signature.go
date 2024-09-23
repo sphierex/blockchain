@@ -3,6 +3,7 @@ package signature
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -34,6 +35,41 @@ func Sign(value any, privateKey *ecdsa.PrivateKey) (v, r, s *big.Int, err error)
 	v, r, s = toSignatureValues(sig)
 
 	return v, r, s, nil
+}
+
+// VerifySignature verifies the signature confirms to our standards and
+// is associated with the data claimed to be signed.
+func VerifySignature(value any, v, r, s *big.Int) error {
+	// Check the recovery id is either 0 or 1.
+	uintV := v.Uint64() - sophiaID
+	if uintV != 0 && uintV != 1 {
+		return errors.New("invalid recovery id")
+	}
+
+	// Check the signature values are valid.
+	if !crypto.ValidateSignatureValues(byte(uintV), r, s, false) {
+		return errors.New("invalid signature values")
+	}
+
+	// Prepare the transaction for recovery and validation.
+	tran, err := stamp(value)
+	if err != nil {
+		return err
+	}
+
+	// Convert the [R|S|V] format into the original 65 bytes.
+	sig := ToSignatureBytes(v, r, s)
+
+	// Capture the uncompressed public key associated with this signature.
+	sigPublicKey, err := crypto.Ecrecover(tran, sig)
+
+	// Check that the given public key created the signature over the data.
+	rs := sig[:crypto.RecoveryIDOffset]
+	if !crypto.VerifySignature(sigPublicKey, tran, rs) {
+		return errors.New("invalid signature")
+	}
+
+	return nil
 }
 
 // ============================================================================
@@ -71,4 +107,28 @@ func toSignatureValues(sig []byte) (v, r, s *big.Int) {
 	v = new(big.Int).SetBytes([]byte{sig[64] + sophiaID})
 
 	return v, r, s
+}
+
+// ToSignatureBytes converts the r, s, v values into a slice of bytes
+// with the removal of the sophiaID.
+func ToSignatureBytes(v, r, s *big.Int) []byte {
+	sig := make([]byte, crypto.SignatureLength)
+
+	rBytes := r.Bytes()
+	if len(rBytes) == 31 {
+		copy(sig[1:], rBytes)
+	} else {
+		copy(sig, rBytes)
+	}
+
+	sBytes := s.Bytes()
+	if len(sBytes) == 31 {
+		copy(sig[33:], sBytes)
+	} else {
+		copy(sig[32:], sBytes)
+	}
+
+	sig[64] = byte(v.Uint64() - sophiaID)
+
+	return sig
 }
