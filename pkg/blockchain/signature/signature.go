@@ -102,27 +102,31 @@ func FromAddress(value any, v, r, s *big.Int) (string, error) {
 
 	// Validate the signature since there can be conversion issues
 	// between [R|S|V] to []bytes, Leading 0's are truncated by big package.
-	// publicKey, err := crypto.SigToPub(data, sig)
-	var sigPublicKey []byte
-	{
-		sigPublicKey, err := crypto.Ecrecover(data, sig)
-		if err != nil {
-			return "", err
-		}
-
-		rs := sig[:crypto.RecoveryIDOffset]
-		if !crypto.VerifySignature(sigPublicKey, data, rs) {
-			return "", errors.New("invalid signature")
-		}
+	publicKey, err := crypto.SigToPub(data, sig)
+	if err != nil {
+		return "", err
 	}
+
+	//var sigPublicKey []byte
+	//{
+	//	sigPublicKey, err := crypto.Ecrecover(data, sig)
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//
+	//	rs := sig[:crypto.RecoveryIDOffset]
+	//	if !crypto.VerifySignature(sigPublicKey, data, rs) {
+	//		return "", errors.New("invalid signature")
+	//	}
+	//}
 
 	// Capture the public key associated with this signature.
 	// x, y := elliptic.Unmarshal(crypto.S256(), sigPublicKey)
-	x, y := crypto.S256().Unmarshal(sigPublicKey)
-	publicKey := ecdsa.PublicKey{Curve: crypto.S256(), X: x, Y: y}
+	//x, y := crypto.S256().Unmarshal(sigPublicKey)
+	//publicKey := ecdsa.PublicKey{Curve: crypto.S256(), X: x, Y: y}
 
 	// Extract the account address from the public key.
-	return crypto.PubkeyToAddress(publicKey).String(), nil
+	return crypto.PubkeyToAddress(*publicKey).String(), nil
 }
 
 // String returns the signature as a string.
